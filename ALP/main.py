@@ -1,18 +1,18 @@
 import xml.etree.ElementTree as ET
-print('Hello World!\n') #Really breaking new ground here
 
-tree = ET.parse('/Users/chasedurand/Desktop/SET1.xml')
+#tree = ET.parse('/Users/chasedurand/Desktop/SET1.xml') #get XML file
+tree = ET.parse('/Users/chasedurand/Desktop/DNB.xml') #get XML file
 root = tree.getroot()
 
-'''
-for LiveSet in root:
-        print(LiveSet.attrib)
-        for child in LiveSet:
-                print(child.attrib, child.tag)
-'''
+sample_path = ""
+sample_set = set()
 
-for sample_element in root.iter('SampleRef'):
-        for path_element in sample_element.iter('PathHint'):
-                for path in path_element.iter('RelativePathElement'):
-                        print(path.get('Dir'),'/',sep='',end='')
-        print(sample_element.find('FileRef').find('Name').get('Value'))
+for sample_element in root.iter('SampleRef'): #iterate over all sample references
+        sample_path = ""
+        for path in sample_element.find('FileRef').find('SearchHint').find('PathHint'):
+                for path_element in path.iter('RelativePathElement'):
+                        sample_path += '/' + path_element.get('Dir')
+        for filename in sample_element.find('FileRef').iter('Name'):
+                sample_path += '/' + filename.get('Value')
+                sample_set.add(sample_path)
+print("\n".join(sorted(sample_set)))
