@@ -6,25 +6,32 @@ import glob
 import collections
 
 projects = []
-projectsSet = set()
-projectsAll = []
 
-for file in glob.glob('/Users/chasedurand/Desktop/ZIPPED/**/*.als'):
-    projects.append(file)
+print('Finding .als files.')
 
-count = 1
-total = len(projects)
+for file in glob.glob('/Users/chasedurand/Desktop/ZIPPED2/**/*.als', recursive=True): #Find all als files in all subdirectories
+    if '/Backup/' not in file: #Filter to ignore backup als files and add remaining to list
+        projects.append(file)
 
+count_projects = 1
+total_projects = len(projects)
+
+print(total_projects, '.als files found.')
+
+print('Converting .als to .xml.')
 
 for i in projects:
     destination = os.path.split(os.path.split(i)[0])[1] + ' - ' + os.path.splitext((os.path.split(i)[1]))[0]
-    #destination = destination
     destination+='.xml'
-    destination = '/Users/chasedurand/Desktop/UNZIPPED/' + destination
-    #with gzip.open(i, 'r') as f_in, open(destination, 'wb') as f_out:
-    #    shutil.copyfileobj(f_in, f_out)
-    print('(',count,'/',total,')',destination)
-    count += 1
+    destination = '/Users/chasedurand/Desktop/UNZIPPED2/' + destination
+    with gzip.open(i, 'r') as f_in, open(destination, 'wb') as f_out:
+        shutil.copyfileobj(f_in, f_out)
+    print('(', count_projects, '/', total_projects, ') ', destination, sep='')
+    count_projects += 1
+
+print('.als to .xml conversion complete.')
+print('Building sample table.')
+
 '''
 tree = ET.parse() #get XML file
 root = tree.getroot()
