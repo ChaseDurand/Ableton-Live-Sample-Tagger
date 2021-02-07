@@ -8,11 +8,17 @@ This utility finds all non-backup Ableton Live Sets in a given directory, parses
 
 Limitations (a lot):
 -I don't know python.
+
 -I don't know basic coding conventions.
+
 -Only tags samples in user-defined folders. Samples from Core Library and Packs are not included (the xmp location is different relative to the sample from user-library samples).
+
 -Only tested on a single computer (Live 10.1.30, macOS 10.15).
+
 -Only works for single volumes.
+
 -File paths are hard coded in (no CLI or ease of use features).
+
 
 I ~~stole~~ took inspiration from a lot of elements of Elixir Beats' code: https://github.com/elixirbeats/abletoolz
 
