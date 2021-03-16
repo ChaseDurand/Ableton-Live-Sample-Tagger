@@ -8,8 +8,22 @@ from xmp_tagger import xmp_tag
 import getpass
 from natsort import natsorted
 
-project_path = '/Users/chasedurand/Desktop/ZIPPED'
-xml_path = '/Users/chasedurand/Desktop/UNZIPPED'
+#Promt user for path to Ableton Live Projects
+while True:
+    project_path = input("Enter Ableton Live Projects directory: ")
+    if os.path.isdir(project_path):
+        break
+    else:
+        print(project_path, " is not a valid path!")
+
+#Promt user for destination path for XML files
+while True:
+    xml_path = input("Enter a directory for converted XML projects: ")
+    if os.path.isdir(xml_path):
+        break
+    else:
+        print(xml_path, " is not a valid path!")
+
 
 #Enables incremental print outputs for different stages
 verbose = True
