@@ -2,154 +2,323 @@ import xml.etree.ElementTree as ET
 import gzip
 import shutil
 import os
-import glob
-from hex import hex_parse
 from xmp_tagger import xmp_tag
-import getpass
 from natsort import natsorted
-
-#Promt user for path to Ableton Live Projects
-while True:
-    project_path = input("Enter Ableton Live Projects directory: ")
-    if os.path.isdir(project_path):
-        break
-    else:
-        print(project_path, " is not a valid path!")
-
-#Promt user for destination path for XML files
-while True:
-    xml_path = input("Enter a directory for converted XML projects: ")
-    if os.path.isdir(xml_path):
-        break
-    else:
-        print(xml_path, " is not a valid path!")
+import sqlite3
+from sqlite3 import Error
+from pathlib import Path
+import tempfile
 
 
-#Enables incremental print outputs for different stages
-verbose = True
+def insertProject(projectPath):
 
-projects = [] #List of paths of ALS project files
+    with conn:
+        cur.execute(
+            "INSERT INTO projects (projectName, setName, setPath, setModDate) VALUES (?,?,?,?)",
+            (str(projectPath.parent.name), str(projectPath.name),
+             str(projectPath), projectPath.stat().st_mtime))
+        return cur.lastrowid
 
-print('Finding .als files.')
-for file in glob.glob(project_path + '/**/*.als',
-                      recursive=True):  # Find all als files in all subdirectories
-    if '/Backup/' not in file:  # Filter to ignore backup als files and add remaining to list
-        projects.append(file)
-count = 1
-total_projects = len(projects)
-print(total_projects, '.als files found.\n')
 
-#Coverts (unzips) all ALS files to XML
-print('Converting .als to .xml.')
-for i in projects:
-    destination = '/' + os.path.split(os.path.split(i)[0])[1] + ' - ' + os.path.splitext((os.path.split(i)[1]))[0] #Preserves project and set name
-    destination += '.xml'
-    destination = xml_path + destination
-    with gzip.open(i, 'r') as f_in, open(destination, 'wb') as f_out:
-        shutil.copyfileobj(f_in, f_out)
-    if verbose:
-        print('(', count, '/', total_projects, ') Converting ', destination, sep='')
-    projects[count - 1] = destination
-    count += 1
-print('.als to .xml conversion complete.\n')
+def findProjects(projectPathRoot):
+    #Finds all new or newly modified projects in a directory
+    print('Finding .als files.')
+    for file in Path(projectPathRoot).glob(
+            '**/*.als'):  # Find all als files in all subdirectories
+        if '/Backup/' not in str(
+                file
+        ):  # Filter to ignore backup als files and add remaining to list
+            #If project is not in database, add
+            cur = conn.cursor()
+            result = cur.execute(
+                'SELECT * FROM projects WHERE projectName= ? AND setName=?;',
+                (str(file.parent.name), str(file.name)))
+            if (len(result.fetchall()) == 0):
+                #Add to database
+                print("Inserting and parsing", file)
+                rowID = insertProject(file)
+                result = cur.execute(
+                    'SELECT * FROM projects WHERE projectID= ?;', (rowID, ))
+                logProjectSamples(result.fetchone())
+            else:
+                #already in database
+                #Need to check if current date modified != logged date modified
+                result = cur.execute(
+                    'SELECT * FROM projects WHERE projectName= ? AND setName=?;',
+                    (str(file.parent.name), str(file.name)))
+                if (file.stat().st_mtime != result.fetchone()['setModDate']):
+                    #if modified date doesn't match
+                    #update mod date
+                    print("Updating", file)
+                    logProjectSamples(result.fetchone())
+                else:
+                    #not modified, no work required
+                    print("Already up to date", file)
+            cur.close()
+            conn.commit()
 
-print('Building sample table.')
 
-count = 1
-
-#Use set to find unique samples in project to count sample only once per project (ex. same file in sampler and audio track)
-#Use dictionary to count number of projects each unique sample appears in (max occurances equal to number of projects)
-#Missing set/dict for files that can no longer be found
-sample_set = set()
-sample_missing_set = set()
-sample_dict = dict()
-sample_missing_dict = dict()
-
-for xml in projects:  # iterate over all xml files
-    tree = ET.parse(xml)
+def logProjectSamples(projectRow):
+    global cur
+    cur.close()
+    global conn
+    cur = conn.cursor()
+    #For each row in project table, create XML file and get all sample paths.
+    #Log samples in the sample and mapping tables
+    xmlPath = convertToXML(projectRow)
+    tree = ET.parse(xmlPath)
     root = tree.getroot()
-    if verbose:
-        print('(', count, '/', total_projects, ') Finding samples in ', xml, sep='')
-        count += 1
-    sample_path = ""
-    #'''
-    sample_set.clear()
-    for sample_element in root.iter('SampleRef'):  # iterate over all sample references in project
+    for sample_element in root.iter('SampleRef'):
         for data_tag in sample_element.iter('FileRef'):
             hex = data_tag.find('Data').text
-            sample_name = data_tag.find('Name').get('Value') #debugging when finding names of samples that messed up
+
             try:
-                hex =  ''.join(hex.split())  # Strip newlines and whitespace
-                path = hex_parse(hex)
-                if os.path.isfile(path):
-                    sample_set.add(path)
-                else:
-                    sample_missing_set.add(path)
+                hex = ''.join(
+                    hex.split())  # Strip newlines and whitespace from hex
+                path = hex2path(hex)
+                #Check if found path already exists in the sample table
+                cur.close()
+                cur = conn.cursor()
+                result = cur.execute('SELECT * FROM samples WHERE path= ?;',
+                                     (str(path), ))
+                #If path is new, add to sample table
+                conn.commit()
+                if (len(result.fetchall()) == 0):
+                    #Sample is new
+                    sampleName = data_tag.find('Name').get('Value')
+                    cur.close()
+                    cur = conn.cursor()
+                    cur.execute(
+                        "INSERT INTO samples (sampleName, path, found) VALUES (?,?,?)",
+                        (sampleName, str(path), path.exists()))
+                    conn.commit
+                    tagSample(str(path))
+                cur.close()
+                cur = conn.cursor()
+                #Get sample ID from path
+                result = cur.execute('SELECT * FROM samples WHERE path = ?;',
+                                     (str(path), ))
+                conn.commit()
+                sampleID = result.fetchone()['sampleID']
+                #Check if mapping already exists in the mapping table
+                cur.close()
+                cur = conn.cursor()
+                result = cur.execute(
+                    'SELECT * FROM projectSampleMapping WHERE projectID = ? AND sampleID = ?;',
+                    (projectRow['projectID'], sampleID))
+                conn.commit()
+                #If mapping is new, add to mapping table
+                if (len(result.fetchall()) == 0):
+                    cur.close()
+                    cur = conn.cursor()
+                    cur.execute(
+                        "INSERT INTO projectSampleMapping (projectID, sampleID) VALUES (?,?)",
+                        (projectRow['projectID'], sampleID))
+                    conn.commit
             except AttributeError:
-                print('could not parse path')
+                print('Could not parse path')
 
-    for sample in sample_set:
-        if sample in sample_dict:
-            sample_dict[sample] += 1
+
+def convertToXML(projectRow):
+    #For each row in project table, convert als file to xml
+    alsPath = projectRow['setPath']
+    #Construct destination XML file name 'ProjectName - SetName.xml'
+    xmlPath = xmlPathRoot.joinpath(projectRow['projectName'] + ' - ' +
+                                   projectRow['setName'] + '.xml')
+    with gzip.open(alsPath, 'r') as f_in, open(xmlPath, 'wb') as f_out:
+        shutil.copyfileobj(f_in, f_out)
+    return xmlPath
+
+
+#Takes given hex data chunk from ALS xml file and returns filepath Path object
+def hex2path(data):
+    path = bytearray.fromhex(data)
+    found_path = ''
+    #Finds : which looks to be uniquely found in the sample path
+    #I should probably figure out what the rest of the hex is and how it's structured
+    #This implementation ignores volumes, which appears to be stored early in the hex, so I'm unsure how it handles samples from another volume, such as a USB drive
+    i = 0
+    while i < len(path):
+        if (path[i] != 0x00) and (path[i] != 0xFF):
+            first_index = i
+            length = path[i]
+            offset = 1
+            found_string = ''
+            while (offset <= length) and (path[first_index + offset] !=
+                                          0x00) and (path[first_index + offset]
+                                                     != 0xFF):
+                if (first_index + offset) == len(path):
+                    print('woah now')
+                found_string += chr(path[first_index + offset])
+                offset += 1
+            if offset == length + 1:
+                #possible valid string
+                if found_string != '/':
+                    found_path = found_string
+            i = first_index + offset
+        i += 1
+    found_path = '/' + found_path
+    return Path(found_path)
+
+
+def initializeDatabase(db_file):
+    #If database doesn't exit, create database with tables.
+    #Regardless, return connection to database.
+    db_file = db_file.joinpath(str(db_file) + '/ALST.db')
+    print(db_file)
+    conn = None
+    try:
+        conn = sqlite3.connect(db_file)
+        print(sqlite3.version)
+    except Error as e:
+        print(e)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    #Check if database with tables already exists
+    try:
+        cursor.execute("""CREATE TABLE projects (
+                    projectID INTEGER PRIMARY KEY,
+                    projectName text,
+                    setName text,
+                    setPath text,
+                    setModDate integer
+                )""")
+    except Error as e:
+        print(e)
+        print("Database already exists.")
+        return conn
+    cursor.execute("""CREATE TABLE samples (
+                sampleID INTEGER PRIMARY KEY,
+                sampleName text,
+                path text,
+                found integer
+            )""")
+
+    cursor.execute("""CREATE TABLE projectSampleMapping (
+                mappingID INTEGER PRIMARY KEY,
+                projectID integer,
+                sampleID integer
+            )""")
+    cursor.close()
+    conn.commit
+    return conn
+
+
+#Tags a single file passed as an input
+def tagSample(path_input):
+
+    #TODO refresh this entire logic
+    #Change paths to pathlib
+    filepath = os.path.splitext((os.path.split(path_input)[0]))[0]
+    file = os.path.splitext(
+        (os.path.split(path_input)[1]))[0] + os.path.splitext(
+            (os.path.split(path_input)[1]))[1]
+
+    if not os.path.isdir(filepath + '/Ableton Folder Info/'):
+        #need to create folder
+        Path(filepath + '/Ableton Folder Info').mkdir(parents=True,
+                                                      exist_ok=True)
+    if not os.path.isfile(filepath + '/Ableton Folder Info/' +
+                          'dc66a3fa-0fe1-5352-91cf-3ec237e9ee90.xmp'):
+        #need to create .xmp file
+        xmp_create(filepath)
+
+    f = open(
+        filepath + '/Ableton Folder Info/' +
+        'dc66a3fa-0fe1-5352-91cf-3ec237e9ee90.xmp', 'r')
+    contents = f.readlines()
+    f.close()
+
+    #Have start and stop ranges for existing samples and tags
+    #For sample, need to check if existing
+    #Search lines for sample
+    count = 0
+    file_line = 0
+    for line in contents:
+        #lines.append(line)
+        if file in line:
+            file_line = count
+        count += 1
+    #If existing, need to check if tag 1 exists
+    if file_line != 0:
+        if '<rdf:li>1</rdf:li>' in contents[file_line + 3]:
+            #sample is already tagged 1
+            print('     Existing tag on', file)
         else:
-            sample_dict[sample] = 1
-
-    for sample in sample_missing_set:
-        if sample in sample_missing_dict:
-            sample_missing_dict[sample] += 1
-        else:
-            sample_missing_dict[sample] = 1
-
-#Print all unique samples
-count = 1
-total_samples = len(sample_dict)
-print(total_samples, 'unique samples found.')
-output = [(a, b) for b, a in sample_dict.items()]   #Reverse dictionary of unique samples
-output = sorted(output, key=lambda x:x[0], reverse=True)    #Sort unique samples by most occurances
-if verbose:
-    for i in output:
-        print(i)
-count = 1
-
-
-
-#print missing samples
+            value = '''                            <rdf:li>1</rdf:li>
 '''
-total_samples = len(sample_missing_dict)
-print(total_samples, 'missing samples found.')
-output = [(a, b) for b, a in sample_missing_dict.items()]
-output = sorted(output, key=lambda x:x[0], reverse=True)
+            contents.insert(file_line + 3, value)
+            print('     Tagged', file)
+    #If not existing, add base sample structure and tag 1
+    else:
+        value = """               <rdf:li rdf:parseType="Resource">
+                   <ablFR:filePath>""" + file + """</ablFR:filePath>
+                      <ablFR:colors>
+                         <rdf:Bag>
+                            <rdf:li>1</rdf:li>
+                         </rdf:Bag>
+                    </ablFR:colors>
+                 </rdf:li>
+"""
+        contents.insert(11, value)
+        print('     Tagged', file)
 
-for i in output:
-    print(i)
-    count += 1
-'''
+    f = open(
+        filepath + '/Ableton Folder Info/' +
+        'dc66a3fa-0fe1-5352-91cf-3ec237e9ee90.xmp', 'w')
+    contents = "".join(contents)
+    f.write(contents)
+    f.close()
+    return ()
 
-#For all found existing samples, need to filter
 
-user = getpass.getuser()
-lib_path = '/Users/'+user+'/Library/Preferences/Ableton'
-live_pref = os.listdir(lib_path)
-live_pref = natsorted(live_pref)
-live_pref = live_pref[len(live_pref)-1]
-lib_path = lib_path + '/' + live_pref + '/Library.cfg'
-f = open(lib_path)
+#Creates a barebones xmp file in given folder with no tags
+#CreatorTool, CreateDate, and MetadataDate are not accurate
+def xmp_create(path_input):
+    #TODO refresh
+    #Change to pathlib
+    f = open(
+        path_input + '/Ableton Folder Info/' +
+        'dc66a3fa-0fe1-5352-91cf-3ec237e9ee90.xmp', "x")
+    f.write("""<x:xmpmeta xmlns:x="adobe:ns:meta/" x:xmptk="XMP Core 5.6.0">
+   <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+      <rdf:Description rdf:about=""
+            xmlns:dc="http://purl.org/dc/elements/1.1/"
+            xmlns:ablFR="https://ns.ableton.com/xmp/fs-resources/1.0/"
+            xmlns:xmp="http://ns.adobe.com/xap/1.0/">
+         <dc:format>application/vnd.ableton.folder</dc:format>
+         <ablFR:resource>folder</ablFR:resource>
+         <ablFR:platform>mac</ablFR:platform>
+         <ablFR:items>
+            <rdf:Bag>
+            </rdf:Bag>
+         </ablFR:items>
+         <xmp:CreatorTool>Updated by Ableton Index 10.1.30</xmp:CreatorTool>
+         <xmp:CreateDate>2021-01-19T21:39:24-05:00</xmp:CreateDate>
+         <xmp:MetadataDate>2021-01-21T07:55:28-05:00</xmp:MetadataDate>
+      </rdf:Description>
+   </rdf:RDF>
+</x:xmpmeta>""")
+    f.close()
+    return ()
 
-user_folders = []
 
-for line in f:
-    if 'UserFolderInfo Id' in line:
-        user_folders.append(line.split('Path=\"')[1].split('\"')[0])
-f.close()
+###########################################
+# Promt user for path to Ableton Live Projects (and SQLite database)
+while True:
+    projectPathRoot = Path(input("Enter Ableton Live Projects directory: "))
+    if projectPathRoot.is_dir():
+        break
+    else:
+        print(projectPathRoot, " is not a valid path!")
 
-samples = sample_dict.keys()
+conn = initializeDatabase(projectPathRoot)
+cur = conn.cursor()
 
-sample_valid = []
+temp_dir = tempfile.TemporaryDirectory()
+xmlPathRoot = Path(temp_dir.name)
+print(temp_dir.name)
+findProjects(projectPathRoot)
 
-for i in samples:
-    if any(x in i for x in user_folders):
-        sample_valid.append(i)
-print(len(sample_valid),'out of',total_samples,' samples in user library will be indexed.')
-
-for i in sample_valid:
-    xmp_tag(i)
+conn.close()
+exit()
