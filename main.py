@@ -1,7 +1,6 @@
 import xml.etree.ElementTree as ET
 import gzip
 import shutil
-import os
 from xmp_tagger import xmp_tag
 from natsort import natsorted
 import sqlite3
@@ -75,7 +74,17 @@ def logProjectSamples(projectRow):
             try:
                 hex = ''.join(
                     hex.split())  # Strip newlines and whitespace from hex
-                path = hex2path(hex)
+                parsedPath = hex2path(hex)
+                volume = parsedPath[0]
+                path = parsedPath[1]
+                if volume != Path('/'):
+                    print("     Sample is on external drive: ",
+                          volume,
+                          path,
+                          sep="")
+                    break
+
+                path = Path.joinpath(volume, path)
                 #Check if found path already exists in the sample table
                 cur.close()
                 cur = conn.cursor()
@@ -92,7 +101,11 @@ def logProjectSamples(projectRow):
                         "INSERT INTO samples (sampleName, path, found) VALUES (?,?,?)",
                         (sampleName, str(path), path.exists()))
                     conn.commit
-                    tagSample(str(path))
+                    if (path.parts[1] == 'Users') or (path.parts[1]
+                                                      == 'Applications'):
+                        tagSample(path)
+                    else:
+                        print("          Error parsing", path)
                 cur.close()
                 cur = conn.cursor()
                 #Get sample ID from path
@@ -132,33 +145,71 @@ def convertToXML(projectRow):
 
 #Takes given hex data chunk from ALS xml file and returns filepath Path object
 def hex2path(data):
-    path = bytearray.fromhex(data)
-    found_path = ''
-    #Finds : which looks to be uniquely found in the sample path
-    #I should probably figure out what the rest of the hex is and how it's structured
-    #This implementation ignores volumes, which appears to be stored early in the hex, so I'm unsure how it handles samples from another volume, such as a USB drive
+    dataArray = bytearray.fromhex(data)
     i = 0
-    while i < len(path):
-        if (path[i] != 0x00) and (path[i] != 0xFF):
-            first_index = i
-            length = path[i]
-            offset = 1
-            found_string = ''
-            while (offset <= length) and (path[first_index + offset] !=
-                                          0x00) and (path[first_index + offset]
-                                                     != 0xFF):
-                if (first_index + offset) == len(path):
-                    print('woah now')
-                found_string += chr(path[first_index + offset])
-                offset += 1
-            if offset == length + 1:
-                #possible valid string
-                if found_string != '/':
-                    found_path = found_string
-            i = first_index + offset
+    #First 6 bytes are the number of bytes of the data
+    #Confirm header reflects data size amount
+    headerSize = 0
+    validChunks = []
+    while i < 6:
+        #Convert byte based on digit significance
+        headerSize += dataArray[i] * (16**(10 - 2 * i))
         i += 1
-    found_path = '/' + found_path
-    return Path(found_path)
+    if headerSize != len(dataArray):
+        print("*** ERROR: Data length does not match header length ***")
+        print("Data length: ", len(dataArray))
+        print("Header length", headerSize)
+        print(dataArray)
+        exit()
+    while i < len(dataArray):
+        #Need to confirm data matches sizeOfData-data-null pattern
+        possibleLength = dataArray[i]
+        if possibleLength == 0x00 or possibleLength == 0xFF:
+            i += 1
+            continue
+        # print("Possible length: ", possibleLength)
+        if i + possibleLength > len(dataArray):
+            # print(
+            #     "*** ERROR: Data chunk length exceeds size of remaining data ***"
+            # )
+            i += 1
+            continue
+        #Ensure no 0x00 in chunk
+        if (0x00 in dataArray[i + 1:i + possibleLength + 1]) or (
+                0xFF in dataArray[i + 1:i + possibleLength + 1]):
+            # print("*** ERROR: Data chunk contains null ***")
+            # print("Invalid data chunk: ",
+            #       dataArray[i + 1:i + possibleLength + 1])
+            i += 1
+            continue
+
+        #Ensure chunk ends with 0x00 or 0xFF
+        if dataArray[i + possibleLength +
+                     1] != 0x00 and dataArray[i + possibleLength + 1] != 0xFF:
+            # print("*** ERROR: Data chunk does not properly terminate ***")
+            # print("Invalid data chunk ends with: ",
+            #       dataArray[i + possibleLength + 1])
+            i += 1
+            continue
+
+        #We now have a valid section of data
+        # print("Valid section of data: ",
+        #       dataArray[i + 1:i + possibleLength + 1])
+        validChunks.append(dataArray[i + 1:i + possibleLength +
+                                     1].decode("utf-8"))
+        i += 1 + possibleLength
+
+    if len(validChunks) < 2:
+        # print("*** ERROR: not enough valid data chunks ***")
+        exit()
+    foundPath = validChunks[len(validChunks) - 2]
+    foundVolume = validChunks[len(validChunks) - 1]
+    # print("          Found valid path for sample: ",
+    #       foundVolume,
+    #       foundPath,
+    #       sep="")
+
+    return (Path(foundVolume), Path(foundPath))
 
 
 def initializeDatabase(db_file):
@@ -206,25 +257,37 @@ def initializeDatabase(db_file):
 
 #Tags a single file passed as an input
 def tagSample(path_input):
-
     #TODO refresh this entire logic
     #Change paths to pathlib
-    filepath = os.path.splitext((os.path.split(path_input)[0]))[0]
-    file = os.path.splitext(
-        (os.path.split(path_input)[1]))[0] + os.path.splitext(
-            (os.path.split(path_input)[1]))[1]
+    filepath = path_input.parent
+    file = path_input.name
 
-    if not os.path.isdir(filepath + '/Ableton Folder Info/'):
+    if not (filepath.joinpath(str(filepath) + 'Ableton Folder Info')).exists():
         #need to create folder
-        Path(filepath + '/Ableton Folder Info').mkdir(parents=True,
-                                                      exist_ok=True)
-    if not os.path.isfile(filepath + '/Ableton Folder Info/' +
-                          'dc66a3fa-0fe1-5352-91cf-3ec237e9ee90.xmp'):
-        #need to create .xmp file
+        Path(str(filepath) + '/Ableton Folder Info').mkdir(parents=True,
+                                                           exist_ok=True)
+
+    # if not os.path.isdir(filepath + '/Ableton Folder Info/'):
+    #     #need to create folder
+    #     Path(filepath + '/Ableton Folder Info').mkdir(parents=True,
+    #                                                   exist_ok=True)
+
+    if not (filepath.joinpath(
+            'Ableton Folder Info',
+            'dc66a3fa-0fe1-5352-91cf-3ec237e9ee90.xmp')).exists():
+        print(
+            str(
+                filepath.joinpath('Ableton Folder Info',
+                                  'dc66a3fa-0fe1-5352-91cf-3ec237e9ee90.xmp')))
         xmp_create(filepath)
 
+    # if not os.path.isfile(filepath + '/Ableton Folder Info/' +
+    #                       'dc66a3fa-0fe1-5352-91cf-3ec237e9ee90.xmp'):
+    #     #need to create .xmp file
+    #     xmp_create(filepath)
+
     f = open(
-        filepath + '/Ableton Folder Info/' +
+        str(filepath) + '/Ableton Folder Info/' +
         'dc66a3fa-0fe1-5352-91cf-3ec237e9ee90.xmp', 'r')
     contents = f.readlines()
     f.close()
@@ -236,19 +299,19 @@ def tagSample(path_input):
     file_line = 0
     for line in contents:
         #lines.append(line)
-        if file in line:
+        if str(file) in line:
             file_line = count
         count += 1
     #If existing, need to check if tag 1 exists
     if file_line != 0:
         if '<rdf:li>1</rdf:li>' in contents[file_line + 3]:
             #sample is already tagged 1
-            print('     Existing tag on', file)
+            print('     Existing tag on', str(file))
         else:
             value = '''                            <rdf:li>1</rdf:li>
 '''
             contents.insert(file_line + 3, value)
-            print('     Tagged', file)
+            print('     Tagged', str(file))
     #If not existing, add base sample structure and tag 1
     else:
         value = """               <rdf:li rdf:parseType="Resource">
@@ -261,10 +324,10 @@ def tagSample(path_input):
                  </rdf:li>
 """
         contents.insert(11, value)
-        print('     Tagged', file)
+        print('     Tagged', str(file))
 
     f = open(
-        filepath + '/Ableton Folder Info/' +
+        str(filepath) + '/Ableton Folder Info/' +
         'dc66a3fa-0fe1-5352-91cf-3ec237e9ee90.xmp', 'w')
     contents = "".join(contents)
     f.write(contents)
@@ -277,8 +340,9 @@ def tagSample(path_input):
 def xmp_create(path_input):
     #TODO refresh
     #Change to pathlib
+
     f = open(
-        path_input + '/Ableton Folder Info/' +
+        str(path_input) + '/Ableton Folder Info/' +
         'dc66a3fa-0fe1-5352-91cf-3ec237e9ee90.xmp', "x")
     f.write("""<x:xmpmeta xmlns:x="adobe:ns:meta/" x:xmptk="XMP Core 5.6.0">
    <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
