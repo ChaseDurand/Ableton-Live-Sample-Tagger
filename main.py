@@ -196,7 +196,8 @@ def hex2path(data):
 def checkDataChunk(dataArray, startIndex, chunkSize):
     if (startIndex + chunkSize) >= len(dataArray):
         return False
-    if dataArray[startIndex + chunkSize] != 0x00:
+    if (dataArray[startIndex + chunkSize] !=
+            0x00) and (dataArray[startIndex + chunkSize] != 0xFF):
         return False
     if 0x00 in dataArray[startIndex:startIndex + chunkSize]:
         return False
