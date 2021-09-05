@@ -161,66 +161,59 @@ def hex2path(data):
         print("Header length", headerSize)
         print(dataArray)
         exit()
-    while i < len(dataArray):
-        #Need to confirm data matches sizeOfData-data-null pattern
-        possibleLength = dataArray[i]
-        if possibleLength == 0x00 or possibleLength == 0xFF:
-            i += 1
-            continue
-        # print("Possible length: ", possibleLength)
-        if i + possibleLength > len(dataArray):
-            # print(
-            #     "*** ERROR: Data chunk length exceeds size of remaining data ***"
-            # )
-            i += 1
-            continue
-        #Ensure no 0x00 in chunk
-        if (0x00 in dataArray[i + 1:i + possibleLength + 1]) or (
-                0xFF in dataArray[i + 1:i + possibleLength + 1]):
-            # print("*** ERROR: Data chunk contains null ***")
-            # print("Invalid data chunk: ",
-            #       dataArray[i + 1:i + possibleLength + 1])
-            i += 1
-            continue
 
-        #Ensure chunk ends with 0x00 or 0xFF
-        if dataArray[i + possibleLength +
-                     1] != 0x00 and dataArray[i + possibleLength + 1] != 0xFF:
-            # print("*** ERROR: Data chunk does not properly terminate ***")
-            # print("Invalid data chunk ends with: ",
-            #       dataArray[i + possibleLength + 1])
-            i += 1
-            continue
+    #Data is roughly structured sizeOfData-data-null pattern
+    #Filepath appears after first 0x12
+    #Volume appears after 0x13
 
-        #We now have a valid section of data
-        # print("Valid section of data: ",
-        #       dataArray[i + 1:i + possibleLength + 1])
-        validChunks.append(dataArray[i + 1:i + possibleLength +
-                                     1].decode("utf-8"))
-        i += 1 + possibleLength
+    foundVolume = ""
+    foundPath = ""
 
-    if len(validChunks) < 2:
-        # print("*** ERROR: not enough valid data chunks ***")
+    i = headerSize - 1
+    while (i > 5):
+        if (dataArray[i] == 0x13):
+            dataChunkSize = dataArray[i + 1] * (16**2) + dataArray[i + 2]
+            if (checkDataChunk(dataArray, i + 3, dataChunkSize)):
+                foundVolume = dataArray[i + 3:i + 3 +
+                                        dataChunkSize].decode("utf-8")
+                break
+        i -= 1
+    while (i > 5):
+        if (dataArray[i] == 0x12):
+            dataChunkSize = dataArray[i + 1] * (16**2) + dataArray[i + 2]
+            if (checkDataChunk(dataArray, i + 3, dataChunkSize)):
+                foundPath = dataArray[i + 3:i + 3 +
+                                      dataChunkSize].decode("utf-8")
+                break
+        i -= 1
+    if foundVolume == "" or foundPath == "":
+        print("***ERROR: volume and path not found***")
         exit()
-    foundPath = validChunks[len(validChunks) - 2]
-    foundVolume = validChunks[len(validChunks) - 1]
-    # print("          Found valid path for sample: ",
-    #       foundVolume,
-    #       foundPath,
-    #       sep="")
-
+    #print("          ", foundVolume, foundPath, sep="")
     return (Path(foundVolume), Path(foundPath))
+
+
+def checkDataChunk(dataArray, startIndex, chunkSize):
+    if (startIndex + chunkSize) >= len(dataArray):
+        return False
+    if dataArray[startIndex + chunkSize] != 0x00:
+        return False
+    if 0x00 in dataArray[startIndex:startIndex + chunkSize]:
+        return False
+    if 0xFF in dataArray[startIndex:startIndex + chunkSize]:
+        return False
+    return True
 
 
 def initializeDatabase(db_file):
     #If database doesn't exit, create database with tables.
     #Regardless, return connection to database.
     db_file = db_file.joinpath(str(db_file) + '/ALST.db')
-    print(db_file)
+    #print(db_file)
     conn = None
     try:
         conn = sqlite3.connect(db_file)
-        print(sqlite3.version)
+        #print(sqlite3.version)
     except Error as e:
         print(e)
     conn.row_factory = sqlite3.Row
@@ -235,7 +228,7 @@ def initializeDatabase(db_file):
                     setModDate integer
                 )""")
     except Error as e:
-        print(e)
+        #print(e)
         print("Database already exists.")
         return conn
     cursor.execute("""CREATE TABLE samples (
@@ -244,7 +237,6 @@ def initializeDatabase(db_file):
                 path text,
                 found integer
             )""")
-
     cursor.execute("""CREATE TABLE projectSampleMapping (
                 mappingID INTEGER PRIMARY KEY,
                 projectID integer,
@@ -267,11 +259,6 @@ def tagSample(path_input):
         Path(str(filepath) + '/Ableton Folder Info').mkdir(parents=True,
                                                            exist_ok=True)
 
-    # if not os.path.isdir(filepath + '/Ableton Folder Info/'):
-    #     #need to create folder
-    #     Path(filepath + '/Ableton Folder Info').mkdir(parents=True,
-    #                                                   exist_ok=True)
-
     if not (filepath.joinpath(
             'Ableton Folder Info',
             'dc66a3fa-0fe1-5352-91cf-3ec237e9ee90.xmp')).exists():
@@ -280,11 +267,6 @@ def tagSample(path_input):
                 filepath.joinpath('Ableton Folder Info',
                                   'dc66a3fa-0fe1-5352-91cf-3ec237e9ee90.xmp')))
         xmp_create(filepath)
-
-    # if not os.path.isfile(filepath + '/Ableton Folder Info/' +
-    #                       'dc66a3fa-0fe1-5352-91cf-3ec237e9ee90.xmp'):
-    #     #need to create .xmp file
-    #     xmp_create(filepath)
 
     f = open(
         str(filepath) + '/Ableton Folder Info/' +
@@ -381,7 +363,7 @@ cur = conn.cursor()
 
 temp_dir = tempfile.TemporaryDirectory()
 xmlPathRoot = Path(temp_dir.name)
-print(temp_dir.name)
+#print(temp_dir.name)
 findProjects(projectPathRoot)
 
 conn.close()
