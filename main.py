@@ -5,7 +5,7 @@ from xmp_tagger import xmp_tag
 from natsort import natsorted
 import sqlite3
 from sqlite3 import Error
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import tempfile
 
 
@@ -76,15 +76,12 @@ def logProjectSamples(projectRow):
                     hex.split())  # Strip newlines and whitespace from hex
                 parsedPath = hex2path(hex)
                 volume = parsedPath[0]
-                path = parsedPath[1]
-                if volume != Path('/'):
-                    print("     Sample is on external drive: ",
-                          volume,
-                          path,
-                          sep="")
-                    break
+                partialPath = parsedPath[1]
 
-                path = Path.joinpath(volume, path)
+                path = Path.joinpath(
+                    volume,
+                    str(partialPath).replace(partialPath.root, "", 1))
+
                 #Check if found path already exists in the sample table
                 cur.close()
                 cur = conn.cursor()
@@ -101,11 +98,7 @@ def logProjectSamples(projectRow):
                         "INSERT INTO samples (sampleName, path, found) VALUES (?,?,?)",
                         (sampleName, str(path), path.exists()))
                     conn.commit
-                    if (path.parts[1] == 'Users') or (path.parts[1]
-                                                      == 'Applications'):
-                        tagSample(path)
-                    else:
-                        print("          Error parsing", path)
+                    tagSample(path)
                 cur.close()
                 cur = conn.cursor()
                 #Get sample ID from path
