@@ -21,6 +21,9 @@ def insertProject(projectPath):
 
 def findProjects(projectPathRoot):
     #Finds all new or newly modified projects in a directory
+
+    #TODO update mod date only after all samples have been parsed,
+    # otherwise project will be skipped following incomplete tagging
     print('Finding .als files.')
     for file in Path(projectPathRoot).glob(
             '**/*.als'):  # Find all als files in all subdirectories
@@ -57,7 +60,27 @@ def findProjects(projectPathRoot):
             conn.commit()
 
 
+def getRelativePath(fileRef, projectRow):
+    #Given an XML FileRef tag and SQLite projectRow, return the sample's relative path
+    fullPath = Path(projectRow['setPath']).parent.absolute(
+    )  #Get relative path root (project file location)
+    #Iterate through relative path directories then append to path
+    for relativePathElement in fileRef.find('RelativePath').iter(
+            'RelativePathElement'):
+        fullPath = Path.joinpath(fullPath, relativePathElement.get('Dir'))
+    fullPath = Path.joinpath(fullPath, fileRef.find('Name').get('Value'))
+    return fullPath
+
+
+def getAbsolutePath(fileRef):
+    #Given an XML FileRef tag, return the sample's absolute path
+    hexData = ''.join(fileRef.find(
+        'Data').text.split())  #Get hex Data blob, stripping newlines
+    return hex2path(hexData)
+
+
 def logProjectSamples(projectRow):
+    #TODO split this function up because too much happens here (finding, parsing, logging)
     global cur
     cur.close()
     global conn
@@ -68,20 +91,19 @@ def logProjectSamples(projectRow):
     tree = ET.parse(xmlPath)
     root = tree.getroot()
     for sample_element in root.iter('SampleRef'):
-        for data_tag in sample_element.iter('FileRef'):
-            hex = data_tag.find('Data').text
+        #for fileRef in sample_element.iter('FileRef'):
+        for fileRef in sample_element.findall('FileRef'):
+
+            #Relative path must be used if HasRelativePath="true" and RelativePathType="3"
+            if fileRef.find('HasRelativePath').get(
+                    'Value') == "true" and fileRef.find(
+                        'RelativePathType').get('Value') == "3":
+                path = getRelativePath(fileRef, projectRow)
+
+            else:
+                path = getAbsolutePath(fileRef)
 
             try:
-                hex = ''.join(
-                    hex.split())  # Strip newlines and whitespace from hex
-                parsedPath = hex2path(hex)
-                volume = parsedPath[0]
-                partialPath = parsedPath[1]
-
-                path = Path.joinpath(
-                    volume,
-                    str(partialPath).replace(partialPath.root, "", 1))
-
                 #Check if found path already exists in the sample table
                 cur.close()
                 cur = conn.cursor()
@@ -91,7 +113,7 @@ def logProjectSamples(projectRow):
                 conn.commit()
                 if (len(result.fetchall()) == 0):
                     #Sample is new
-                    sampleName = data_tag.find('Name').get('Value')
+                    sampleName = fileRef.find('Name').get('Value')
                     cur.close()
                     cur = conn.cursor()
                     cur.execute(
@@ -138,12 +160,12 @@ def convertToXML(projectRow):
 
 #Takes given hex data chunk from ALS xml file and returns filepath Path object
 def hex2path(data):
+
     dataArray = bytearray.fromhex(data)
     i = 0
     #First 6 bytes are the number of bytes of the data
     #Confirm header reflects data size amount
     headerSize = 0
-    validChunks = []
     while i < 6:
         #Convert byte based on digit significance
         headerSize += dataArray[i] * (16**(10 - 2 * i))
@@ -183,7 +205,10 @@ def hex2path(data):
         print("***ERROR: volume and path not found***")
         exit()
     #print("          ", foundVolume, foundPath, sep="")
-    return (Path(foundVolume), Path(foundPath))
+
+    return Path.joinpath(
+        Path(foundVolume),
+        str(Path(foundPath)).replace(Path(foundPath).root, "", 1))
 
 
 def checkDataChunk(dataArray, startIndex, chunkSize):
@@ -256,10 +281,12 @@ def tagSample(path_input):
     if not (filepath.joinpath(
             'Ableton Folder Info',
             'dc66a3fa-0fe1-5352-91cf-3ec237e9ee90.xmp')).exists():
-        print(
-            str(
-                filepath.joinpath('Ableton Folder Info',
-                                  'dc66a3fa-0fe1-5352-91cf-3ec237e9ee90.xmp')))
+
+        # print(
+        #     str(
+        #         filepath.joinpath('Ableton Folder Info',
+        #                           'dc66a3fa-0fe1-5352-91cf-3ec237e9ee90.xmp')))
+
         xmp_create(filepath)
 
     f = open(
