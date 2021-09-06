@@ -1,12 +1,11 @@
 import xml.etree.ElementTree as ET
 import gzip
 import shutil
-from xmp_tagger import xmp_tag
-from natsort import natsorted
 import sqlite3
 from sqlite3 import Error
-from pathlib import Path, PurePosixPath
+from pathlib import Path
 import tempfile
+from ALST.pathParsing import *
 
 
 def insertProject(projectPath):
@@ -58,25 +57,6 @@ def findProjects(projectPathRoot):
                     print("Already up to date", file)
             cur.close()
             conn.commit()
-
-
-def getRelativePath(fileRef, projectRow):
-    #Given an XML FileRef tag and SQLite projectRow, return the sample's relative path
-    fullPath = Path(projectRow['setPath']).parent.absolute(
-    )  #Get relative path root (project file location)
-    #Iterate through relative path directories then append to path
-    for relativePathElement in fileRef.find('RelativePath').iter(
-            'RelativePathElement'):
-        fullPath = Path.joinpath(fullPath, relativePathElement.get('Dir'))
-    fullPath = Path.joinpath(fullPath, fileRef.find('Name').get('Value'))
-    return fullPath
-
-
-def getAbsolutePath(fileRef):
-    #Given an XML FileRef tag, return the sample's absolute path
-    hexData = ''.join(fileRef.find(
-        'Data').text.split())  #Get hex Data blob, stripping newlines
-    return hex2path(hexData)
 
 
 def logProjectSamples(projectRow):
@@ -156,72 +136,6 @@ def convertToXML(projectRow):
     with gzip.open(alsPath, 'r') as f_in, open(xmlPath, 'wb') as f_out:
         shutil.copyfileobj(f_in, f_out)
     return xmlPath
-
-
-#Takes given hex data chunk from ALS xml file and returns filepath Path object
-def hex2path(data):
-
-    dataArray = bytearray.fromhex(data)
-    i = 0
-    #First 6 bytes are the number of bytes of the data
-    #Confirm header reflects data size amount
-    headerSize = 0
-    while i < 6:
-        #Convert byte based on digit significance
-        headerSize += dataArray[i] * (16**(10 - 2 * i))
-        i += 1
-    if headerSize != len(dataArray):
-        print("*** ERROR: Data length does not match header length ***")
-        print("Data length: ", len(dataArray))
-        print("Header length", headerSize)
-        print(dataArray)
-        exit()
-
-    #Data is roughly structured sizeOfData-data-null pattern
-    #Filepath appears after first 0x12
-    #Volume appears after 0x13
-
-    foundVolume = ""
-    foundPath = ""
-
-    i = headerSize - 1
-    while (i > 5):
-        if (dataArray[i] == 0x13):
-            dataChunkSize = dataArray[i + 1] * (16**2) + dataArray[i + 2]
-            if (checkDataChunk(dataArray, i + 3, dataChunkSize)):
-                foundVolume = dataArray[i + 3:i + 3 +
-                                        dataChunkSize].decode("utf-8")
-                break
-        i -= 1
-    while (i > 5):
-        if (dataArray[i] == 0x12):
-            dataChunkSize = dataArray[i + 1] * (16**2) + dataArray[i + 2]
-            if (checkDataChunk(dataArray, i + 3, dataChunkSize)):
-                foundPath = dataArray[i + 3:i + 3 +
-                                      dataChunkSize].decode("utf-8")
-                break
-        i -= 1
-    if foundVolume == "" or foundPath == "":
-        print("***ERROR: volume and path not found***")
-        exit()
-    #print("          ", foundVolume, foundPath, sep="")
-
-    return Path.joinpath(
-        Path(foundVolume),
-        str(Path(foundPath)).replace(Path(foundPath).root, "", 1))
-
-
-def checkDataChunk(dataArray, startIndex, chunkSize):
-    if (startIndex + chunkSize) >= len(dataArray):
-        return False
-    if (dataArray[startIndex + chunkSize] !=
-            0x00) and (dataArray[startIndex + chunkSize] != 0xFF):
-        return False
-    if 0x00 in dataArray[startIndex:startIndex + chunkSize]:
-        return False
-    if 0xFF in dataArray[startIndex:startIndex + chunkSize]:
-        return False
-    return True
 
 
 def initializeDatabase(db_file):
