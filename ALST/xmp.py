@@ -27,6 +27,7 @@ xmpTemplate = """<x:xmpmeta xmlns:x="adobe:ns:meta/" x:xmptk="XMP Core 5.6.0">
 </x:xmpmeta>"""
 
 #XMP directory+file structure
+#TODO figure out xmp filename meaning
 xmpFilepathTail = Path('Ableton Folder Info',
                        'dc66a3fa-0fe1-5352-91cf-3ec237e9ee90.xmp')
 
