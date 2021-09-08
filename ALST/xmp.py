@@ -44,8 +44,14 @@ def tagSample(path_input):
     #Check for folder and XMP file, creating if not found
     if not (samplePath.joinpath(str(samplePath) +
                                 'Ableton Folder Info')).exists():
-        Path(str(samplePath) + '/Ableton Folder Info').mkdir(parents=True,
-                                                             exist_ok=True)
+        #TODO need to check if we can mkdir (volume might be removed)
+        #If not, return false
+        if samplePath.exists() != True:
+            print('     Unable to tag', str(sample), 'at', str(samplePath))
+            return
+        else:
+            Path(str(samplePath) + '/Ableton Folder Info').mkdir(parents=True,
+                                                                 exist_ok=True)
 
     if not (samplePath.joinpath(str(xmpFilepathTail))).exists():
         createXMP(samplePath)

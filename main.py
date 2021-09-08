@@ -17,5 +17,7 @@ conn = initializeDatabase(projectPathRoot)
 alsFiles = getALSFiles(projectPathRoot)
 for als in alsFiles:
     parseALS(als, conn)
+#TODO need to go through all samples and tag if needed
+#Samples previously not tagged but logged could now be accessible
 conn.close
 exit()
