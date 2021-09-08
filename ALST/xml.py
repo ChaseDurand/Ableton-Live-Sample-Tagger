@@ -1,9 +1,10 @@
 from pathlib import Path
+import xml.etree.ElementTree as ET
 
 
-def getRelativePath(fileRef, projectRow):
+def getRelativePath(fileRef, alsFile):
     #Given an XML FileRef tag and SQLite projectRow, return the sample's relative path
-    fullPath = Path(projectRow['setPath']).parent.absolute(
+    fullPath = alsFile.parent.absolute(
     )  #Get relative path root (project file location)
     #Iterate through relative path directories then append to path
     for relativePathElement in fileRef.find('RelativePath').iter(
