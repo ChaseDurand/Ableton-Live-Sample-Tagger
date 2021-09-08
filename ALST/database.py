@@ -1,17 +1,18 @@
 import sqlite3
 from sqlite3 import Error
 from pathlib import Path
+'''
+Functions for handling database operations.
+'''
 
 
-def initializeDatabase(db_file):
-    #If database doesn't exit, create database with tables.
+def initializeDatabase(projectPathRoot):
+    #If database doesn't exist in given directory, create database with needed tables.
     #Regardless, return connection to database.
-    db_file = db_file.joinpath(str(db_file) + '/ALST.db')
-    #print(db_file)
+    dbPath = projectPathRoot.joinpath(str(projectPathRoot) + '/ALST.db')
     conn = None
     try:
-        conn = sqlite3.connect(db_file)
-        #print(sqlite3.version)
+        conn = sqlite3.connect(dbPath)
     except Error as e:
         print(e)
     conn.row_factory = sqlite3.Row
@@ -46,6 +47,7 @@ def initializeDatabase(db_file):
 
 
 def alsInDB(alsFile, cur):
+    #Check if a given project+set appear in the DB
     result = cur.execute(
         'SELECT * FROM projects WHERE projectName= ? AND setName=?;',
         (str(alsFile.parent.name), str(alsFile.name)))
@@ -61,6 +63,7 @@ def alsInDB(alsFile, cur):
 
 
 def alsUpToDate(alsFile, cur):
+    #Check if a given project+set are up to date in the DB
     result = cur.execute(
         'SELECT * FROM projects WHERE projectName= ? AND setName=?;',
         (str(alsFile.parent.name), str(alsFile.name)))

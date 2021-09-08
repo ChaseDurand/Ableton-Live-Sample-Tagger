@@ -4,10 +4,14 @@ import gzip
 from ALST.database import *
 from ALST.xml import *
 from ALST.xmp import *
+'''
+Functions for parsing ALS files.
+'''
 
 
 def getALSFiles(projectPathRoot):
-    #Find all ALS files in project directory and return as list
+    #Find all ALS files recursively in project directory and return as list
+    #Ignores backup files
     alsFiles = []
     print('Finding .als files in', str(projectPathRoot))
     for alsFile in Path(projectPathRoot).glob('**/*.als'):
@@ -17,6 +21,7 @@ def getALSFiles(projectPathRoot):
 
 
 def parseALS(alsFile, conn):
+    #Finds, tags, and logs all sample references in a given ALS file
     cur = conn.cursor()
     #Process ALS and add samples to DB
     #If als is in DB and up to date, then no work is necessary
@@ -41,8 +46,8 @@ def parseALS(alsFile, conn):
 
             else:
                 samplePath = getAbsolutePath(fileRef)
-
             #If path is not new to this project, then we don't need to attempt tag+log+mapping
+            #If this is our first time seeing this project-sample combo this execution, attempt tag+log+map
             if samplePath not in loggedSamples:
                 loggedSamples[samplePath] = True
                 #tag XMP

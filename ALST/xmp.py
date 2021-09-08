@@ -1,6 +1,9 @@
 from pathlib import Path
+'''
+Functions for parsing and writing XMP files.
+'''
 
-#Barebones XMP file
+#Barebones XMP file template
 #CreatorTool, CreateDate, and MetadataDate are not accurate
 #TODO add custom creator tool and date info
 xmpTemplate = """<x:xmpmeta xmlns:x="adobe:ns:meta/" x:xmptk="XMP Core 5.6.0">
@@ -23,6 +26,7 @@ xmpTemplate = """<x:xmpmeta xmlns:x="adobe:ns:meta/" x:xmptk="XMP Core 5.6.0">
    </rdf:RDF>
 </x:xmpmeta>"""
 
+#XMP directory+file structure
 xmpFilepathTail = Path('Ableton Folder Info',
                        'dc66a3fa-0fe1-5352-91cf-3ec237e9ee90.xmp')
 
@@ -60,6 +64,7 @@ def tagSample(path_input):
     contents = f.readlines()
     f.close()
 
+    #TODO improve this parsing
     #Have start and stop ranges for existing samples and tags
     #For sample, need to check if existing
     #Search lines for sample

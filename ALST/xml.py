@@ -1,5 +1,8 @@
 from pathlib import Path
 import xml.etree.ElementTree as ET
+'''
+Functions for parsing XML files.
+'''
 
 
 def getRelativePath(fileRef, alsFile):
