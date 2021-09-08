@@ -46,6 +46,8 @@ def parseALS(alsFile, conn):
 
             else:
                 samplePath = getAbsolutePath(fileRef)
+            if samplePath == None:
+                continue
             #If path is not new to this project, then we don't need to attempt tag+log+mapping
             #If this is our first time seeing this project-sample combo this execution, attempt tag+log+map
             if samplePath not in loggedSamples:

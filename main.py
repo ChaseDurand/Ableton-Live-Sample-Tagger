@@ -15,6 +15,7 @@ while True:
 
 conn = initializeDatabase(projectPathRoot)
 alsFiles = getALSFiles(projectPathRoot)
+print("Found", len(alsFiles), ".als files")
 for als in alsFiles:
     parseALS(als, conn)
 #TODO need to go through all samples and tag if needed

@@ -19,6 +19,10 @@ def getRelativePath(fileRef, alsFile):
 
 def getAbsolutePath(fileRef):
     #Given an XML FileRef tag, return the sample's absolute path
+    if fileRef.find('Data').text == None:
+        print("     ***ERROR no data tag for",
+              fileRef.find('Name').get('Value'))
+        return None
     hexData = ''.join(fileRef.find(
         'Data').text.split())  #Get hex Data blob, stripping newlines
     return hex2path(hexData)
