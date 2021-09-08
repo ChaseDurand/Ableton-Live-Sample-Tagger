@@ -6,5 +6,4 @@ This is a utility for tagging samples that appear across any Ableton Live Set to
 
 This utility finds all non-backup Ableton Live Sets in a given directory, parses them to find all unique samples (Ableton Live Sets are gzipped xml files), and adds a tag via an xmp file (used by Live for collection tags). On the initial run, a SQLite database is created in the provided project root folder to log all projects and samples. On later executions, projects that have been modified are scanned and new samples are added and tagged.
 
-- Tested on Live 10
-- Tested on macOS (10.13 and 10.15)
+Tested on Live 10, macOS (10.13 and 10.15).
