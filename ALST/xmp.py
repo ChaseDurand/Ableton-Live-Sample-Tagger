@@ -51,7 +51,7 @@ def tagSample(path_input):
                                 'Ableton Folder Info')).exists():
         #TODO need to check if we can mkdir (volume might be removed)
         #If not, return false
-        if samplePath.exists() != True:
+        if path_input.exists() != True:
             print('     Unable to tag', str(sample), 'at', str(samplePath))
             return
         else:
