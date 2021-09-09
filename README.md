@@ -6,6 +6,6 @@ This is a utility for tagging samples that appear across any Ableton Live Set to
 
 This utility finds all non-backup Ableton Live Sets in a given directory, parses them to find all unique samples (Ableton Live Sets are gzipped xml files), and adds a tag via an xmp file (used by Live for collection tags).
 
-Bash scripts in the Analysis folder provide basic data summaries/highlights.
+Scripts in the Analysis folder provide basic data summaries/highlights.
 
 Tested on Live 10, macOS (10.13 and 10.15).
