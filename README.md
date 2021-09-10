@@ -14,6 +14,6 @@ Tested on Live 10, macOS (10.13 and 10.15).
 
 Run [main.py](/main.py) from any location, then enter the root directory of project files when prompted.
 
-## Disclaimer
+## _Disclaimer_
 
-**This project is not endorsed or affaliated with Ableton in any way. "Ableton" is a trademark of Ableton AG.**
+_This project is not endorsed or affaliated with Ableton in any way. "Ableton" is a trademark of Ableton AG._
