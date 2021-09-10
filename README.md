@@ -16,4 +16,4 @@ Run [main.py](/main.py) from any location, then enter the root directory of proj
 
 ## Disclaimer
 
-This project is not endorsed or affaliated with Ableton in any way. "Ableton" is a trademark of Ableton AG.
+This project is not endorsed or affiliated with Ableton in any way. "Ableton" is a trademark of Ableton AG.
