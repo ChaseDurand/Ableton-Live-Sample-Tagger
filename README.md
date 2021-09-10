@@ -9,3 +9,7 @@ This utility finds all non-backup Ableton Live Sets in a given directory, parses
 Scripts in the [Analysis](/Analysis) folder provide basic data summaries/highlights.
 
 Tested on Live 10, macOS (10.13 and 10.15).
+
+## Usage
+
+Run main.py from any location, then enter the root directory of project files when prompted.
