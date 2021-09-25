@@ -59,7 +59,7 @@ def alsInDB(alsFile, cur):
         #Project is in DB
         return True
     print("***ERROR: Multiple instances of project in DB***")
-    exit()
+    exit(1)
 
 
 def alsUpToDate(alsFile, cur):
