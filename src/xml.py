@@ -50,7 +50,7 @@ def hex2path(data):
     foundPath = decodeDataChunk(dataArray, i, 0x12)
     if foundVolume == "" or foundPath == "":
         print("***ERROR: volume and path not found***")
-        exit()
+        exit(1)
     return Path.joinpath(
         Path(foundVolume),
         str(Path(foundPath)).replace(Path(foundPath).root, "", 1))
@@ -64,7 +64,7 @@ def decodeDataChunk(dataArray, i, stopByte):
                 return dataArray[i + 3:i + 3 + dataChunkSize].decode("utf-8")
         i -= 1
     print("***ERROR: Unable to decode data chunk***")
-    exit()
+    exit(1)
 
 
 def checkDataBlobSize(dataArray):
