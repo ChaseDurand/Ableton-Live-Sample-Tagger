@@ -1,9 +1,9 @@
 from pathlib import Path
 import xml.etree.ElementTree as ET
 import gzip
-from ALST.database import *
-from ALST.xml import *
-from ALST.xmp import *
+from src.database import *
+from src.xml import *
+from src.xmp import *
 '''
 Functions for parsing ALS files.
 '''

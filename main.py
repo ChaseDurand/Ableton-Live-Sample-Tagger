@@ -1,8 +1,8 @@
 import xml.etree.ElementTree as ET
 from sqlite3 import Error
 from pathlib import Path
-from ALST.als import *
-from ALST.database import *
+from src.als import *
+from src.database import *
 
 ###########################################
 # Promt user for path to Ableton Live Projects (and SQLite database)

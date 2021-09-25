@@ -1,7 +1,7 @@
 import unittest
 from pathlib import Path
 from unittest.case import expectedFailure
-from ALST.als import *
+from src.als import *
 from testResources import *
 
 
