@@ -32,8 +32,11 @@ def hex2path(data):
     #Takes given hex data chunk from ALS xml file and returns filepath Path object
     #Data is roughly structured sizeOfData/data/null pattern
     dataArray = bytearray.fromhex(data)
-    checkDataBlobSize(dataArray)  #Confirm header reflects datablob size
-
+    if not checkDataBlobSize(
+            dataArray):  #Confirm header reflects datablob size
+        print("*** ERROR: Data length does not match header length ***")
+        print(dataArray)
+        exit(1)
     foundVolume = ""
     foundPath = ""
     i = len(dataArray) - 1
@@ -74,12 +77,8 @@ def checkDataBlobSize(dataArray):
         headerSize += dataArray[i] * (16**(10 - 2 * i))
         i += 1
     if headerSize != len(dataArray):
-        print("*** ERROR: Data length does not match header length ***")
-        print("Data length: ", len(dataArray))
-        print("Header length", headerSize)
-        print(dataArray)
-        exit()
-    return
+        return False
+    return True
 
 
 def checkDataChunk(dataArray, startIndex, chunkSize):
