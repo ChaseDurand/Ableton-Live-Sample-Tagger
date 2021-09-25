@@ -18,6 +18,9 @@ class testals(unittest.TestCase):
         self.assertIn(
             Path('Tests/testSet Project/testFolder/testFolder2/testSet4.als'),
             getALSFiles(Path()))
+        # Check if multiple projects are searched
+        self.assertIn(Path('Tests/testSet2 Project/testSet5.als'),
+                      getALSFiles(Path()))
         # Check if backups are ignored
         self.assertNotIn(
             Path('Tests/testSet Project/testSet [2021-09-24 232020].als'),
