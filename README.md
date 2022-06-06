@@ -12,7 +12,9 @@ Tested on Live 10, macOS (10.13 and 10.15).
 
 ## Usage
 
-Run [main.py](/main.py) from any location, then enter the root directory of project files when prompted.
+Pass the directory of project files as an argument. If no existing database is found, a new one will be created. Subsequent runs will use the existing database.
+
+```python3 alst.py path/to/projects```
 
 ## Disclaimer
 
