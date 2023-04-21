@@ -20,22 +20,22 @@ def initializeDatabase(projectPathRoot):
     # Check if database with tables already exists
     try:
         cursor.execute("""
-            CREATE TABLE projects (
+            CREATE TABLE IF NOT EXISTS projects (
                 projectID INTEGER PRIMARY KEY,
                 projectName TEXT,
                 setName TEXT,
                 projectPath TEXT UNIQUE,
                 setPath TEXT,
                 setModDate INTEGER,
-                lastModified
+                lastModified INTEGER
             )
         """)
     except Error as e:
-        # print(e)
-        print("Database already exists.")
+        print(e)
+        print("Error creating 'projects' table.")
         return conn
     cursor.execute("""
-        CREATE TABLE samples (
+        CREATE TABLE IF NOT EXISTS samples (
             sampleID INTEGER PRIMARY KEY,
             sampleName TEXT,
             path TEXT,
@@ -43,7 +43,7 @@ def initializeDatabase(projectPathRoot):
         )
     """)
     cursor.execute("""
-        CREATE TABLE projectSampleMapping (
+        CREATE TABLE IF NOT EXISTS projectSampleMapping (
             mappingID INTEGER PRIMARY KEY,
             projectID INTEGER,
             sampleID INTEGER
