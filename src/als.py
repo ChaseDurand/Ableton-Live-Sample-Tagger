@@ -29,7 +29,7 @@ def getALSFiles(projectPathRoot):
 
 def addALStoDB(als, cur):
     cur.execute('''
-        INSERT OR REPLACE INTO projects (projectPath, name, lastModified)
+        INSERT OR REPLACE INTO projects (projectPath, projectName, lastModified)
         VALUES (?, ?, ?);
         ''', (str(als), als.name, als.stat().st_mtime))
     cur.execute('''

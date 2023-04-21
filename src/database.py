@@ -20,13 +20,14 @@ def initializeDatabase(projectPathRoot):
     # Check if database with tables already exists
     try:
         cursor.execute("""
-            CREATE TABLE projects_new (
+            CREATE TABLE projects (
                 projectID INTEGER PRIMARY KEY,
                 projectName TEXT,
                 setName TEXT,
                 projectPath TEXT UNIQUE,
                 setPath TEXT,
-                setModDate INTEGER
+                setModDate INTEGER,
+                lastModified
             )
         """)
     except Error as e:
@@ -80,25 +81,31 @@ def alsUpToDate(alsFile, cur):
 
 
 def addALStoDB(alsFile, cur):
-    #Add ALS file to DB
-    #If ALS file is in DB, update mod date
+    cur.execute('''
+        INSERT OR REPLACE INTO projects (projectPath, setName, setModDate)
+        VALUES (?, ?, ?);
+        ''', (str(alsFile), alsFile.name, alsFile.stat().st_mtime))
+    
     if (alsInDB(alsFile, cur)):
-        #Update mod date
+        # Update mod date
         cur.execute(
             "UPDATE projects SET setModDate=? WHERE projectName=? AND setName=?;",
             (alsFile.stat().st_mtime, str(
                 alsFile.parent.name), str(alsFile.name)))
         print("Updated", alsFile.name, "in DB.")
     else:
-        #New ALS, add to DB
+        # New ALS, add to DB
         cur.execute(
-            "INSERT INTO projects (projectName, setName, setPath, setModDate) VALUES (?,?,?,?)",
+            "INSERT INTO projects (projectName, setName, projectPath, setModDate) VALUES (?,?,?,?)",
             (str(alsFile.parent.name), str(
                 alsFile.name), str(alsFile), alsFile.stat().st_mtime))
         print("Added", alsFile.name, "to DB.")
-    result = cur.execute('SELECT * FROM projects WHERE setPath = ?;',
+    
+    result = cur.execute('SELECT * FROM projects WHERE projectPath = ?;',
                          (str(alsFile), ))
     return result.fetchone()['projectID']
+
+
 
 
 def addSampletoDB(samplePath, cur):
