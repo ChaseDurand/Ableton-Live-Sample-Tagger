@@ -47,29 +47,29 @@ def parseALS(alsFile, conn):
         if (alsUpToDate(alsFile, cur)):
             print(alsFile.name, "is already up to date in DB.")
             return
-    loggedSamples = {}
+    loggedSamples = set()
     projectID = addALStoDB(alsFile, cur)
-    xmlFile = gzip.open(alsFile, 'r')
-    root = (ET.parse(xmlFile)).getroot()
+    with gzip.open(alsFile, 'r') as xmlFile:
+        root = (ET.parse(xmlFile)).getroot()
 
-    for sample_element in root.iter('SampleRef'):
-        for fileRef in sample_element.findall('FileRef'):
-            has_relative_path_element = fileRef.find('HasRelativePath')
-            relative_path_type_element = fileRef.find('RelativePathType')
-            if (has_relative_path_element is not None and 
-                has_relative_path_element.get('Value') == "true" and
-                relative_path_type_element is not None and
-                relative_path_type_element.get('Value') == "3"):
-                samplePath = getRelativePath(fileRef, alsFile)
-            else:
-                samplePath = getAbsolutePath(fileRef)
-            if samplePath == None:
-                continue
-            if samplePath not in loggedSamples:
-                loggedSamples[samplePath] = True
-                tagSample(samplePath)
-                sampleID = addSampletoDB(samplePath, cur)
-                addProjectSampleMapping(projectID, sampleID, cur)
+        for sample_element in root.iter('SampleRef'):
+            for fileRef in sample_element.findall('FileRef'):
+                has_relative_path_element = fileRef.find('HasRelativePath')
+                relative_path_type_element = fileRef.find('RelativePathType')
+                if (has_relative_path_element is not None and 
+                    has_relative_path_element.get('Value') == "true" and
+                    relative_path_type_element is not None and
+                    relative_path_type_element.get('Value') == "3"):
+                    samplePath = getRelativePath(fileRef, alsFile)
+                else:
+                    samplePath = getAbsolutePath(fileRef)
+                if samplePath == None:
+                    continue
+                if samplePath not in loggedSamples:
+                    loggedSamples.add(samplePath)
+                    tagSample(samplePath)
+                    sampleID = addSampletoDB(samplePath, cur)
+                    addProjectSampleMapping(projectID, sampleID, cur)
     conn.commit()
     cur.close()
     return
