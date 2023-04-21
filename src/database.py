@@ -7,8 +7,8 @@ Functions for handling database operations.
 
 
 def initializeDatabase(projectPathRoot):
-    #If database doesn't exist in given directory, create database with needed tables.
-    #Regardless, return connection to database.
+    # If database doesn't exist in given directory, create database with needed tables.
+    # Regardless, return connection to database.
     dbPath = projectPathRoot.joinpath(str(projectPathRoot) + '/ALST.db')
     conn = None
     try:
@@ -17,32 +17,39 @@ def initializeDatabase(projectPathRoot):
         print(e)
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
-    #Check if database with tables already exists
+    # Check if database with tables already exists
     try:
-        cursor.execute("""CREATE TABLE projects (
-                    projectID INTEGER PRIMARY KEY,
-                    projectName text,
-                    setName text,
-                    setPath text,
-                    setModDate integer
-                )""")
+        cursor.execute("""
+            CREATE TABLE projects_new (
+                projectID INTEGER PRIMARY KEY,
+                projectName TEXT,
+                setName TEXT,
+                projectPath TEXT UNIQUE,
+                setPath TEXT,
+                setModDate INTEGER
+            )
+        """)
     except Error as e:
-        #print(e)
+        # print(e)
         print("Database already exists.")
         return conn
-    cursor.execute("""CREATE TABLE samples (
-                sampleID INTEGER PRIMARY KEY,
-                sampleName text,
-                path text,
-                found integer
-            )""")
-    cursor.execute("""CREATE TABLE projectSampleMapping (
-                mappingID INTEGER PRIMARY KEY,
-                projectID integer,
-                sampleID integer
-            )""")
+    cursor.execute("""
+        CREATE TABLE samples (
+            sampleID INTEGER PRIMARY KEY,
+            sampleName TEXT,
+            path TEXT,
+            found INTEGER
+        )
+    """)
+    cursor.execute("""
+        CREATE TABLE projectSampleMapping (
+            mappingID INTEGER PRIMARY KEY,
+            projectID INTEGER,
+            sampleID INTEGER
+        )
+    """)
     cursor.close()
-    conn.commit
+    conn.commit()
     return conn
 
 
