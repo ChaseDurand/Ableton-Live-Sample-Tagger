@@ -1,4 +1,5 @@
 import sys
+import concurrent.futures
 from pathlib import Path
 from src.als import *
 from src.database import *
@@ -17,14 +18,17 @@ def main():
         print("Error: ", projectPathRoot, " is not a valid path!")
         exit(1)
 
-    conn = initializeDatabase(projectPathRoot)
     alsFiles = getALSFiles(projectPathRoot)
     print("Found", len(alsFiles), ".als files")
-    for als in alsFiles:
-        parseALS(als, conn)
+
+    conn = initializeDatabase(projectPathRoot)
+    # Updated function call to use multithreading
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        executor.map(lambda alsFile: parseALS(alsFile, projectPathRoot), alsFiles)
+
     # TODO need to go through all samples and tag if needed
     # Samples previously not tagged but logged could now be accessible
-    conn.close
+    conn.close()
     exit()
 
 if __name__ == '__main__':
